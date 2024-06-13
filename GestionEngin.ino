@@ -31,6 +31,12 @@ double currentLat = 0.0;  // Initialize current latitude
 double currentLon = 0.0;  // Initialize current longitude
 double distance = 0.0;    // Initialize distance
 
+// Bouton variables
+const int pinBouton = A1;
+unsigned long tempsHaut = 0;
+unsigned long tempsBas = 0;
+bool dernierEtatBouton = LOW;
+
 // ID de l'engin
 String idEngin = "1";
 
@@ -38,6 +44,7 @@ String idEngin = "1";
 void setup()
 {
     Serial.begin(9600);
+    pinMode(pinBouton, INPUT);
 
     while (!Serial)
         ;
@@ -82,7 +89,7 @@ void setup()
 void loop()
 {
 
-
+    verifierEtatBouton();
     // Attendez que les données soient disponibles
     while (Serial1.available() > 0)
     {
@@ -176,3 +183,31 @@ void sendLoRaWANMessage(String data)
     }
 }
 
+void verifierEtatBouton()
+{
+    unsigned long tempsActuel = millis();
+    int etatBouton = analogRead(pinBouton) > 512 ? HIGH : LOW;
+
+    if (etatBouton != dernierEtatBouton)
+    {
+        if (etatBouton == HIGH)
+        {
+            tempsHaut = tempsActuel;
+            Serial.println(" ------------------------ ");
+            Serial.println("Etat engin ON: ");
+            Serial.println(" ------------------------ ");
+        }
+        else
+        {
+            tempsBas = tempsActuel;
+            Serial.println(" ------------------------ ");
+            Serial.print("Etat engin OFF: ");
+            unsigned long intervalle = tempsBas - tempsHaut;
+            Serial.print("Temps total de fonctionnement : ");
+            Serial.print(intervalle / 1000);
+            Serial.println(" secondes");
+            Serial.println(" ------------------------ ");
+        }
+        dernierEtatBouton = etatBouton;
+    }
+}
