@@ -4,7 +4,8 @@
 #include <Arduino.h>
 
 // Définition de la constante pour le rayon de la Terre en kilomètres
-const double EARTH_RADIUS = 6371.01;  // Rayon de la Terre en kilomètres
+
+const double EARTH_RADIUS = 6371.0; // Rayon de la Terre en kilomètres
 
 /**
  * @brief Calcule la distance entre deux points géographiques en utilisant la formule de Haversine.

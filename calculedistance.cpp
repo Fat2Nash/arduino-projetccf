@@ -10,6 +10,7 @@
 
 #include <Arduino.h>
 #include "calculedistance.h"
+#include <math.h>
 
 double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     // Convertir les latitudes et longitudes en radians

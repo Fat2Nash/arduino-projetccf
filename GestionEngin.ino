@@ -1,4 +1,4 @@
-// Last update: 2024-07-06
+// Last update: 18/06/2024
 // Author:
 //      - Quentin Legros
 // Description:
@@ -14,56 +14,50 @@
 #include <String.h>
 #include "calculedistance.h"
 #include "alerte.h"
-// #include "calculedistance.cpp"
+#include "arduino_secrets.h"
 
 TinyGPSPlus gps;
 LoRaModem modem;
 
-#include "arduino_secrets.h"
-// Please enter your sensitive data in the Secret tab or arduino_secrets.h
+// Sensitive data from arduino_secrets.h
 String appEui = SECRET_APP_EUI;
 String appKey = SECRET_APP_KEY;
 
 // Variables pour calculer la distance
-double previousLat = 0.0; // Initialize previous latitude
-double previousLon = 0.0; // Initialize previous longitude
-double currentLat = 0.0;  // Initialize current latitude
-double currentLon = 0.0;  // Initialize current longitude
-double distance = 0.0;    // Initialize distance
+double previousLat = 0.0;
+double previousLon = 0.0;
+double currentLat = 0.0;
+double currentLon = 0.0;
+double distance = 0.0;
 
 // Bouton variables
 const int pinBouton = A1;
 unsigned long tempsHaut = 0;
 unsigned long tempsBas = 0;
+unsigned long tempsFonctionnement = 0; // Temps de fonctionnement total en secondes
 bool dernierEtatBouton = LOW;
+
 
 // ID de l'engin
 String idEngin = "1";
-
 
 void setup()
 {
     Serial.begin(9600);
     pinMode(pinBouton, INPUT);
 
-    while (!Serial)
-        ;
+    while (!Serial);
 
     // Initialisation du module LoRa et connexion au réseau
     if (!modem.begin(EU868))
     {
         Serial.println("Échec du démarrage du module");
-        while (1)
-        {
-        }
+        while (1);
     };
 
     // Initialisation du GPS
     Serial1.begin(9600);
     Serial.println("GPS initialisé");
-
-    // Initialisation du module d'alerte
-    // setupAlerte();
 
     // Affichage des informations du module LoRa
     Serial.print("La version de votre module est : ");
@@ -76,19 +70,14 @@ void setup()
     if (!connected)
     {
         Serial.println("Quelque chose s'est mal passé ; êtes-vous à l'intérieur ? Rapprochez-vous d'une fenêtre et réessayez.");
-        while (1)
-        {
-        }
+        while (1);
     }
-
-
     // Régler l'intervalle d'interrogation à 60 secondes.
     modem.minPollInterval(60);
 }
 
 void loop()
 {
-
     verifierEtatBouton();
     // Attendez que les données soient disponibles
     while (Serial1.available() > 0)
@@ -96,26 +85,20 @@ void loop()
         // Obtenir les données du GPS
         if (gps.encode(Serial1.read()))
         {
-            verifierEtatBouton();
-            // Faire appel a la fonction displayInfo
+            verifierEtatBouton(); // Vérifier à nouveau l'état du bouton après la mise à jour GPS
             displayInfo();
-            // Vérification de la tension de la batterie
             checkBatteryVoltage();
-            delay(5000);
+            delay(5000); // Attente pour éviter la surcharge de messages
         }
-        // Vérification de la tension de la batterie
-          checkBatteryVoltage();
     }
+    // Vérifier la tension de la batterie régulièrement
+    checkBatteryVoltage();
 }
-
-
 
 void displayInfo()
 {
-    //   Serial.println("Je suis dans le displayInfo");
     if (gps.location.isValid())
     {
-
         // Obtenir la latitude et la longitude actuelles
         currentLat = gps.location.lat();
         currentLon = gps.location.lng();
@@ -129,13 +112,13 @@ void displayInfo()
 
         // Imprimer la distance calculée sur le moniteur série
         Serial.print("Distance: ");
-        Serial.println(distance, 2); // Print with 2 decimal places
+        Serial.println(distance, 2);
 
         // Vérifier si la distance est supérieure à 50 mètres
         if (distance > 50.0)
         {
-            // Préparer les données à envoyer   [latitude, longitude]
-            String dataToSend = "[" + idEngin + " , " + String(currentLat, 6) + " , " + String(currentLon, 6) + " , 0]";
+            // Préparer les données à envoyer [idEngin, latitude, longitude, temps_fonctionnement, alerte]
+            String dataToSend = "[" + idEngin + " , " + String(currentLat, 6) + " , " + String(currentLon, 6) + " , " + String(tempsFonctionnement) + " , "+typeAlerte+"]";
 
             // Envoi de données sur LoRaWAN
             sendLoRaWANMessage(dataToSend);
@@ -153,7 +136,6 @@ void displayInfo()
     }
 }
 
-
 void sendLoRaWANMessage(String data)
 {
     int err;
@@ -167,8 +149,6 @@ void sendLoRaWANMessage(String data)
         message += data;
         message += "}";
         Serial.println(message);
-        // Attendre 5 secondes avant d'envoyer un autre message
-        // delay(5000);
         return;
     }
     else
@@ -178,7 +158,6 @@ void sendLoRaWANMessage(String data)
         Serial.println("(vous pouvez envoyer un nombre limité de messages par minute, en fonction de la puissance du signal");
         Serial.println("il peut varier de 1 message toutes les quelques secondes à 1 message toutes les minutes)");
         Serial.println(" ------------------------ ");
-        // retourner dans le loop pour attendre le prochain message
         return;
     }
 }
@@ -203,10 +182,16 @@ void verifierEtatBouton()
             Serial.println(" ------------------------ ");
             Serial.print("Etat engin OFF: ");
             unsigned long intervalle = tempsBas - tempsHaut;
+            tempsFonctionnement = intervalle / 1000; // Ajouter le temps de fonctionnement en secondes
             Serial.print("Temps total de fonctionnement : ");
-            Serial.print(intervalle / 1000);
+            Serial.print(tempsFonctionnement);
             Serial.println(" secondes");
             Serial.println(" ------------------------ ");
+
+            // Préparer les données à envoyer [idEngin, latitude, longitude, temps_fonctionnement, alerte]
+            String dataToSend = "[" + idEngin + " , " + String(currentLat, 6) + " , " + String(currentLon, 6) + " , " + String(tempsFonctionnement) + " , "+typeAlerte+"]";
+            sendLoRaWANMessage(dataToSend);
+            tempsFonctionnement = 0;
         }
         dernierEtatBouton = etatBouton;
     }
